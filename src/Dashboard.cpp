@@ -350,49 +350,73 @@ void Dashboard::addSalesDataToSKU() {
     
     std::cout << "Sales data added successfully!" << std::endl;
 }
-// NEW: ROAS Bar Chart - Visual representation of top performing SKUs
 void Dashboard::displayROASChart() const {
-    auto topPerformers = analytics.findTopPerformers(8);
+    auto topPerformers = analytics.findTopPerformers(10);
     
     if (topPerformers.empty()) {
         std::cout << "No data available! Please add sample data first (Option 5)." << std::endl;
         return;
     }
     
-    std::cout << "\n" << std::string(60, '=') << std::endl;
-    std::cout << "           ROAS DISTRIBUTION CHART" << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
-    std::cout << "SKU Name" << std::string(32, ' ') << "ROAS   Chart" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
+    std::cout << "\n" << std::string(100, '=') << std::endl;
+    std::cout << "                            TOP PERFORMING SKUs BY ROAS" << std::endl;
+    std::cout << std::string(100, '=') << std::endl;
     
-    // Find maximum ROAS for scaling
-    double maxROAS = 0.0;
-    for (const auto& performer : topPerformers) {
-        maxROAS = std::max(maxROAS, performer.second);
-    }
+    // Table Header
+    std::cout << std::left 
+              << std::setw(5) << "RANK" 
+              << std::setw(28) << "PRODUCT NAME" 
+              << std::setw(16) << "CATEGORY" 
+              << std::setw(8) << "ROAS" 
+              << std::setw(12) << "INVENTORY" 
+              << std::setw(25) << "PERFORMANCE LEVEL" 
+              << std::endl;
     
-    // Display each SKU with bar chart
+    std::cout << std::string(100, '-') << std::endl;
+    
     int rank = 1;
     for (const auto& performer : topPerformers) {
         const SKU* sku = analytics.getSKU(performer.first);
         if (sku) {
-            // Calculate bar length (scale to 30 characters max)
-            int barLength = static_cast<int>((performer.second / maxROAS) * 30);
-            std::string chartBar(barLength, '#'); // FIXED: Using # for bars
+            std::string performance;
+            std::string indicator;
             
-            std::cout << std::left << std::setw(2) << rank << ". " 
-                      << std::setw(35) << sku->getName().substr(0, 34) 
-                      << "[" << std::setw(5) << std::right << std::fixed << std::setprecision(2) << performer.second 
-                      << "] " << chartBar << std::endl;
+            if (performer.second >= 6.0) {
+                performance = "EXCELLENT";
+                indicator = "[#######]";
+            } else if (performer.second >= 4.0) {
+                performance = "GOOD     ";
+                indicator = "[#####  ]";
+            } else if (performer.second >= 2.0) {
+                performance = "AVERAGE  ";
+                indicator = "[###    ]";
+            } else {
+                performance = "NEEDS WORK";
+                indicator = "[#      ]";
+            }
+            
+            std::cout << std::left 
+                      << std::setw(5) << rank
+                      << std::setw(28) << sku->getName().substr(0, 27)
+                      << std::setw(16) << sku->getCategory().substr(0, 15)
+                      << std::setw(8) << std::fixed << std::setprecision(2) << performer.second
+                      << std::setw(12) << sku->getInventory()
+                      << std::setw(25) << (performance + " " + indicator)
+                      << std::endl;
             rank++;
         }
     }
     
-    std::cout << std::string(60, '-') << std::endl;
-    std::cout << "Chart shows relative ROAS performance (longer bars = better)" << std::endl;
+    std::cout << std::string(100, '=') << std::endl;
+    
+    // Performance legend
+    std::cout << "PERFORMANCE SCALE:" << std::endl;
+    std::cout << "EXCELLENT [#######] (ROAS >= 6.0) - Outstanding performance" << std::endl;
+    std::cout << "GOOD      [#####  ] (ROAS >= 4.0) - Strong performance" << std::endl;
+    std::cout << "AVERAGE   [###    ] (ROAS >= 2.0) - Acceptable performance" << std::endl;
+    std::cout << "NEEDS WORK[#      ] (ROAS < 2.0)  - Requires optimization" << std::endl;
 }
 
-// NEW: Category Pie Chart - Visual revenue distribution by category
 void Dashboard::displayCategoryPieChart() const {
     auto categories = analytics.getAllCategories();
     
@@ -403,8 +427,9 @@ void Dashboard::displayCategoryPieChart() const {
     
     std::map<std::string, double> categoryRevenue;
     double totalRevenue = 0.0;
+    int totalSKUs = 0;
     
-    // Calculate total revenue per category
+    // Calculate total revenue and SKU count per category
     for (const auto& category : categories) {
         auto skus = analytics.getSKUsByCategory(category);
         double categoryTotal = 0.0;
@@ -413,31 +438,78 @@ void Dashboard::displayCategoryPieChart() const {
         }
         categoryRevenue[category] = categoryTotal;
         totalRevenue += categoryTotal;
+        totalSKUs += skus.size();
     }
     
-    std::cout << "\n" << std::string(60, '=') << std::endl;
-    std::cout << "       REVENUE DISTRIBUTION BY CATEGORY" << std::endl;
-    std::cout << std::string(60, '=') << std::endl;
-    std::cout << "Category" << std::string(14, ' ') << "Share   Chart" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
+    std::cout << "\n" << std::string(90, '=') << std::endl;
+    std::cout << "                        CATEGORY PERFORMANCE REPORT" << std::endl;
+    std::cout << std::string(90, '=') << std::endl;
     
-    // Display each category with visual representation
-    for (const auto& pair : categoryRevenue) {
+    // Table Header
+    std::cout << std::left 
+              << std::setw(5) << "RANK"
+              << std::setw(20) << "CATEGORY" 
+              << std::setw(8) << "SKUs" 
+              << std::setw(10) << "SHARE" 
+              << std::setw(25) << "MARKET SHARE" 
+              << std::setw(18) << "REVENUE" 
+              << std::endl;
+    
+    std::cout << std::string(90, '-') << std::endl;
+    
+    // Sort categories by revenue (descending) - FIXED: using explicit types
+    std::vector<std::pair<std::string, double>> sortedCategories(categoryRevenue.begin(), categoryRevenue.end());
+    std::sort(sortedCategories.begin(), sortedCategories.end(),
+        [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b) {
+            return a.second > b.second;
+        });
+    
+    int rank = 1;
+    for (const auto& pair : sortedCategories) {
+        auto skus = analytics.getSKUsByCategory(pair.first);
+        int skuCount = skus.size();
         int percentage = static_cast<int>((pair.second / totalRevenue) * 100);
-        int chartWidth = std::max(percentage / 3, 1); // Scale for better visibility
-        std::string pieSlice(chartWidth, '*'); // FIXED: Using * for pie slices
         
-        std::cout << std::left << std::setw(20) << pair.first 
-                  << " " << std::setw(3) << std::right << percentage << "% "
-                  << pieSlice << "  $" << std::fixed << std::setprecision(2) << pair.second << std::endl;
+        // Create market share bar
+        std::string marketShareBar;
+        int barLength = static_cast<int>((percentage / 100.0) * 20);
+        for (int i = 0; i < 20; i++) {
+            if (i < barLength) marketShareBar += "|";
+            else marketShareBar += " ";
+        }
+        marketShareBar = "[" + marketShareBar + "]";
+        
+        // Business impact rating
+        std::string impact;
+        if (percentage >= 30) impact = "HIGH IMPACT";
+        else if (percentage >= 15) impact = "MEDIUM IMPACT";
+        else impact = "LOW IMPACT";
+        
+        std::cout << std::left 
+                  << std::setw(5) << rank
+                  << std::setw(20) << pair.first 
+                  << std::setw(8) << skuCount
+                  << std::setw(10) << (std::to_string(percentage) + "%")
+                  << std::setw(25) << marketShareBar
+                  << "$" << std::setw(17) << std::fixed << std::setprecision(2) << pair.second
+                  << std::endl;
+        rank++;
     }
     
-    std::cout << std::string(60, '-') << std::endl;
-    std::cout << "Total Revenue: $" << std::fixed << std::setprecision(2) << totalRevenue << std::endl;
-    std::cout << "Chart shows revenue share percentage by category" << std::endl;
+    std::cout << std::string(90, '-') << std::endl;
+    
+    // Business insights
+    std::cout << "BUSINESS INSIGHTS:" << std::endl;
+    std::cout << "• Total Revenue: $" << std::fixed << std::setprecision(2) << totalRevenue << std::endl;
+    std::cout << "• Total SKUs: " << totalSKUs << " across " << categories.size() << " categories" << std::endl;
+    
+    if (!sortedCategories.empty()) {
+        std::cout << "• Top Category: " << sortedCategories[0].first << " ("
+                  << static_cast<int>((sortedCategories[0].second / totalRevenue) * 100) 
+                  << "% of total revenue)" << std::endl;
+    }
 }
 
-// NEW: Helper method to calculate total revenue
 double Dashboard::getTotalRevenue() const {
     double total = 0.0;
     auto categories = analytics.getAllCategories();
@@ -450,3 +522,4 @@ double Dashboard::getTotalRevenue() const {
     return total;
 
 }
+
