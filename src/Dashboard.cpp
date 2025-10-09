@@ -59,39 +59,99 @@ void Dashboard::displayAllSKUs() const {
 }
 
 void Dashboard::displayTopPerformers() const {
-    auto topPerformers = analytics.findTopPerformers(5);
+    auto topPerformers = analytics.findTopPerformers(10); // Show top 10
     
-    std::cout << "\n=== TOP 5 PERFORMING SKUs ===" << std::endl;
+    std::cout << "\n" << std::string(100, '=') << std::endl;
+    std::cout << "                           TOP 10 PERFORMING SKUs BY ROAS" << std::endl;
+    std::cout << std::string(100, '=') << std::endl;
+    
+    // Table Header
+    std::cout << std::left 
+              << std::setw(4) << "RANK" 
+              << std::setw(18) << "SKU ID" 
+              << std::setw(35) << "PRODUCT NAME" 
+              << std::setw(15) << "CATEGORY" 
+              << std::setw(10) << "ROAS" 
+              << std::setw(12) << "INVENTORY" 
+              << std::setw(15) << "PERFORMANCE" 
+              << std::endl;
+    
+    std::cout << std::string(100, '-') << std::endl;
+    
     if (topPerformers.empty()) {
-        std::cout << "No SKUs available!" << std::endl;
+        std::cout << "No SKUs available! Please add sample data first." << std::endl;
         return;
     }
     
+    // Table Rows
     for (size_t i = 0; i < topPerformers.size(); ++i) {
-        // FIXED: Use const SKU*
         const SKU* sku = analytics.getSKU(topPerformers[i].first);
         if (sku) {
-            std::cout << i + 1 << ". ";
-            sku->displayInfo();
+            double roas = topPerformers[i].second;
+            std::string performance;
+            
+            if (roas >= 5.0) performance = "EXCELLENT ★";
+            else if (roas >= 3.0) performance = "GOOD ✓";
+            else if (roas >= 1.0) performance = "AVERAGE ●";
+            else performance = "POOR ✗";
+            
+            std::cout << std::left 
+                      << std::setw(4) << i + 1
+                      << std::setw(18) << sku->getSkuId().substr(0, 17)
+                      << std::setw(35) << sku->getName().substr(0, 34)
+                      << std::setw(15) << sku->getCategory().substr(0, 14)
+                      << std::setw(10) << std::fixed << std::setprecision(2) << roas
+                      << std::setw(12) << sku->getInventory()
+                      << std::setw(15) << performance
+                      << std::endl;
         }
     }
+    
+    std::cout << std::string(100, '=') << std::endl;
 }
 
 void Dashboard::displayStockoutRisk() const {
     auto riskSKUs = analytics.detectStockoutRisk(2.0); // 2 weeks threshold
     
-    std::cout << "\n=== SKUs WITH STOCKOUT RISK (Less than 2 weeks inventory) ===" << std::endl;
+    std::cout << "\n" << std::string(90, '=') << std::endl;
+    std::cout << "                      SKUs WITH STOCKOUT RISK (Less than 2 weeks inventory)" << std::endl;
+    std::cout << std::string(90, '=') << std::endl;
+    
+    // Table Header
+    std::cout << std::left 
+              << std::setw(18) << "SKU ID" 
+              << std::setw(30) << "PRODUCT NAME" 
+              << std::setw(15) << "CATEGORY" 
+              << std::setw(10) << "ROAS" 
+              << std::setw(12) << "INVENTORY" 
+              << std::setw(15) << "RISK LEVEL" 
+              << std::endl;
+    
+    std::cout << std::string(90, '-') << std::endl;
+    
     if (riskSKUs.empty()) {
-        std::cout << "No SKUs at risk! Good inventory levels." << std::endl;
+        std::cout << "🎉 No SKUs at risk! Excellent inventory management." << std::endl;
     } else {
         for (const auto& skuId : riskSKUs) {
-            // FIXED: Use const SKU*
             const SKU* sku = analytics.getSKU(skuId);
             if (sku) {
-                sku->displayInfo();
+                double roas = sku->calculateTotalROAS();
+                std::string riskLevel = "HIGH ⚠️";
+                
+                std::cout << std::left 
+                          << std::setw(18) << sku->getSkuId().substr(0, 17)
+                          << std::setw(30) << sku->getName().substr(0, 29)
+                          << std::setw(15) << sku->getCategory().substr(0, 14)
+                          << std::setw(10) << std::fixed << std::setprecision(2) << roas
+                          << std::setw(12) << sku->getInventory()
+                          << std::setw(15) << riskLevel
+                          << std::endl;
             }
         }
+        std::cout << "💡 Recommendation: Consider restocking these items to avoid lost sales." << std::endl;
     }
+    
+    std::cout << std::string(90, '=') << std::endl;
 }
 
 void Dashboard::displayCategoryAnalysis() const {
@@ -388,4 +448,5 @@ double Dashboard::getTotalRevenue() const {
         }
     }
     return total;
+
 }
