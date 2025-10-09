@@ -136,14 +136,76 @@ void SKUAnalytics::generateCategoryReport() const {
 }
 
 void SKUAnalytics::displayAllSKUs() const {
-    std::cout << "\n=== ALL SKUs ===" << std::endl;
-    std::cout << "Total SKUs: " << skuDatabase.size() << std::endl;
-    std::cout << "----------------" << std::endl;
+    std::cout << "\n" << std::string(120, '=') << std::endl;
+    std::cout << "                                  ALL SKUs INVENTORY (" << skuDatabase.size() << " ITEMS)" << std::endl;
+    std::cout << std::string(120, '=') << std::endl;
     
+    // Table Header
+    std::cout << std::left 
+              << std::setw(18) << "SKU ID" 
+              << std::setw(30) << "PRODUCT NAME" 
+              << std::setw(18) << "CATEGORY" 
+              << std::setw(12) << "PRICE" 
+              << std::setw(10) << "ROAS" 
+              << std::setw(12) << "INVENTORY" 
+              << std::setw(15) << "STATUS" 
+              << std::endl;
+    
+    std::cout << std::string(120, '-') << std::endl;
+    
+    // Table Rows
     for (const auto& pair : skuDatabase) {
-        pair.second.displayInfo();
+        const SKU& sku = pair.second;
+        double roas = sku.calculateTotalROAS();
+        
+        // Determine status based on ROAS and inventory
+        std::string status;
+        if (roas == 0.0) {
+            status = "NO SALES";
+        } else if (roas >= 5.0) {
+            status = "HIGH ROAS";
+        } else if (roas >= 3.0) {
+            status = "GOOD ROAS";
+        } else if (roas >= 1.0) {
+            status = "LOW ROAS";
+        } else {
+            status = "POOR ROAS";
+        }
+        
+        // Check inventory status
+        double salesVelocity = calculateSalesVelocity(sku);
+        if (salesVelocity > 0 && sku.getInventory() / salesVelocity < 2.0) {
+            status += " | RISK";
+        }
+        
+        std::cout << std::left 
+                  << std::setw(18) << sku.getSkuId().substr(0, 17)
+                  << std::setw(30) << sku.getName().substr(0, 29)
+                  << std::setw(18) << sku.getCategory().substr(0, 17)
+                  << "$" << std::setw(11) << std::fixed << std::setprecision(2) << sku.getPrice()
+                  << std::setw(10) << std::fixed << std::setprecision(2) << roas
+                  << std::setw(12) << sku.getInventory()
+                  << std::setw(15) << status
+                  << std::endl;
     }
+    
+    std::cout << std::string(120, '=') << std::endl;
+    
+    // Summary Statistics
+    int highROAS = 0, goodROAS = 0, lowROAS = 0, poorROAS = 0, noSales = 0;
+    for (const auto& pair : skuDatabase) {
+        double roas = pair.second.calculateTotalROAS();
+        if (roas == 0.0) noSales++;
+        else if (roas >= 5.0) highROAS++;
+        else if (roas >= 3.0) goodROAS++;
+        else if (roas >= 1.0) lowROAS++;
+        else poorROAS++;
+    }
+    
+    std::cout << "SUMMARY: " << highROAS << " High ROAS | " << goodROAS << " Good ROAS | " 
+              << lowROAS << " Low ROAS | " << poorROAS << " Poor ROAS | " << noSales << " No Sales Data" << std::endl;
 }
+
 
 size_t SKUAnalytics::getSKUCount() const {
     return skuDatabase.size();
@@ -167,4 +229,5 @@ double SKUAnalytics::calculateOverallROAS() const {
     }
     
     return (totalAdSpend > 0) ? totalRevenue / totalAdSpend : 0.0;
+
 }
