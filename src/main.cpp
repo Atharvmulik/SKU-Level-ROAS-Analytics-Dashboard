@@ -8,9 +8,7 @@ int main() {
     
     Dashboard dashboard;
     
-    // Try to load existing data on startup
     std::cout << "Attempting to load existing data..." << std::endl;
-    // This would call dashboard.loadFromCSV() if you add it to public interface
     
     dashboard.run();
     

@@ -7,7 +7,6 @@
 #include <vector>   
 #include <algorithm> 
 
-// ADD THESE NEW METHODS TO Dashboard.cpp:
 
 void Dashboard::displayMenu() const {
     std::cout << "\n=== SKU-LEVEL ROAS ANALYTICS DASHBOARD ===" << std::endl;
@@ -112,7 +111,6 @@ void Dashboard::updateSKU() {
     
     SKU updatedSKU(skuId, name, category, price, cost, inventory);
     
-    // Copy sales history from existing SKU
     for (const auto& sale : existingSKU->getSalesHistory()) {
         updatedSKU.addSalesData(sale);
     }
@@ -207,7 +205,6 @@ void Dashboard::exportData() {
     }
 }
 
-// Update addCustomSKU to immediately show ROAS
 void Dashboard::addCustomSKU() {
     std::string id, name, category;
     double price, cost;

@@ -149,10 +149,10 @@ void SKUAnalytics::generateCategoryReport() const {
 
 void SKUAnalytics::displayAllSKUs() const {
     std::cout << "\n" << std::string(120, '=') << std::endl;
-    std::cout << "                                  ALL SKUs INVENTORY (" << skuDatabase.size() << " ITEMS)" << std::endl;
+    std::cout << "ALL SKUs INVENTORY (" << skuDatabase.size() << " ITEMS)" << std::endl;
     std::cout << std::string(120, '=') << std::endl;
     
-    // Table Header
+   
     std::cout << std::left 
               << std::setw(18) << "SKU ID" 
               << std::setw(30) << "PRODUCT NAME" 
@@ -165,12 +165,10 @@ void SKUAnalytics::displayAllSKUs() const {
     
     std::cout << std::string(120, '-') << std::endl;
     
-    // Table Rows
     for (const auto& pair : skuDatabase) {
         const SKU& sku = pair.second;
         double roas = sku.calculateTotalROAS();
         
-        // Determine status based on ROAS and inventory
         std::string status;
         if (roas == 0.0) {
             status = "NO SALES";
@@ -184,7 +182,6 @@ void SKUAnalytics::displayAllSKUs() const {
             status = "POOR ROAS";
         }
         
-        // Check inventory status
         double salesVelocity = calculateSalesVelocity(sku);
         if (salesVelocity > 0 && sku.getInventory() / salesVelocity < 2.0) {
             status += " | RISK";
@@ -203,7 +200,6 @@ void SKUAnalytics::displayAllSKUs() const {
     
     std::cout << std::string(120, '=') << std::endl;
     
-    // Summary Statistics
     int highROAS = 0, goodROAS = 0, lowROAS = 0, poorROAS = 0, noSales = 0;
     for (const auto& pair : skuDatabase) {
         double roas = pair.second.calculateTotalROAS();
@@ -247,11 +243,9 @@ bool SKUAnalytics::loadFromCSV(const std::string& filename) {
         auto data = CSVHandler::readCSV(filename);
         if (data.empty()) return false;
         
-        // Clear existing data
         skuDatabase.clear();
         categoryMap.clear();
         
-        // Skip header row if exists
         size_t startRow = (data[0][0] == "SKU_ID" || data[0][0] == "sku_id") ? 1 : 0;
         
         for (size_t i = startRow; i < data.size(); ++i) {
@@ -269,7 +263,6 @@ bool SKUAnalytics::loadFromCSV(const std::string& filename) {
             }
         }
         
-        // Load sales data from separate file if exists
         std::string salesFilename = "sales_" + filename;
         std::ifstream salesFile(salesFilename);
         if (salesFile.good()) {
@@ -303,10 +296,8 @@ bool SKUAnalytics::saveToCSV(const std::string& filename) const {
     try {
         std::vector<std::vector<std::string>> data;
         
-        // Add header
         data.push_back({"SKU_ID", "NAME", "CATEGORY", "PRICE", "COST", "INVENTORY"});
         
-        // Add SKU data
         for (const auto& pair : skuDatabase) {
             const SKU& sku = pair.second;
             data.push_back({
@@ -330,10 +321,8 @@ bool SKUAnalytics::exportSalesDataToCSV(const std::string& filename) const {
     try {
         std::vector<std::vector<std::string>> data;
         
-        // Add header
         data.push_back({"SKU_ID", "YEAR", "MONTH", "DAY", "REVENUE", "AD_SPEND", "UNITS_SOLD"});
         
-        // Add sales data
         for (const auto& pair : skuDatabase) {
             const SKU& sku = pair.second;
             for (const auto& sale : sku.getSalesHistory()) {
@@ -359,7 +348,6 @@ bool SKUAnalytics::exportSalesDataToCSV(const std::string& filename) const {
 bool SKUAnalytics::updateSKU(const std::string& skuId, const SKU& updatedSKU) {
     auto it = skuDatabase.find(skuId);
     if (it != skuDatabase.end()) {
-        // Remove from old category
         std::string oldCategory = it->second.getCategory();
         auto& oldCategorySKUs = categoryMap[oldCategory];
         oldCategorySKUs.erase(
@@ -367,12 +355,10 @@ bool SKUAnalytics::updateSKU(const std::string& skuId, const SKU& updatedSKU) {
             oldCategorySKUs.end()
         );
         
-        // Clean up empty categories
         if (oldCategorySKUs.empty()) {
             categoryMap.erase(oldCategory);
         }
         
-        // Add to new category
         skuDatabase[skuId] = updatedSKU;
         categoryMap[updatedSKU.getCategory()].push_back(skuId);
         
