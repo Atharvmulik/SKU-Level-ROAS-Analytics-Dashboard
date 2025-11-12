@@ -1,7 +1,11 @@
 #include "SKUAnalytics.h"
+#include "CSVHandler.h"
 #include <iostream>
 #include <algorithm>
 #include <iomanip>
+#include <limits>
+#include <fstream>
+#include <sstream>
 
 void SKUAnalytics::addSKU(const SKU& sku) {
     skuDatabase[sku.getSkuId()] = sku;
@@ -31,21 +35,24 @@ SKU* SKUAnalytics::getSKU(const std::string& skuId) {
     return (it != skuDatabase.end()) ? &it->second : nullptr;
 }
 
-// ADD THIS CONST VERSION OF getSKU
 const SKU* SKUAnalytics::getSKU(const std::string& skuId) const {
     auto it = skuDatabase.find(skuId);
     return (it != skuDatabase.end()) ? &it->second : nullptr;
 }
 
 std::vector<std::pair<std::string, double>> SKUAnalytics::findTopPerformers(int topN) const {
+    if (topN < 0) {
+        throw std::invalid_argument("topN cannot be negative");
+    }
+    
     std::vector<std::pair<std::string, double>> performances;
+    performances.reserve(skuDatabase.size());
     
     for (const auto& pair : skuDatabase) {
         double roas = pair.second.calculateTotalROAS();
         performances.emplace_back(pair.first, roas);
     }
     
-    // FIXED: Replace auto with explicit types in lambda
     std::sort(performances.begin(), performances.end(),
         [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b) {
             return a.second > b.second;
@@ -77,17 +84,22 @@ std::vector<std::string> SKUAnalytics::detectStockoutRisk(double threshold) cons
 }
 
 double SKUAnalytics::calculateSalesVelocity(const SKU& sku) const {
-    // Simplified: average weekly sales based on historical data
     const auto& salesHistory = sku.getSalesHistory();
     if (salesHistory.empty()) return 0.0;
     
     double totalUnits = 0.0;
     for (const auto& sale : salesHistory) {
-        totalUnits += sale.unitsSold;
+        totalUnits += sale.getUnitsSold();
     }
     
-    // Assuming 4 weeks of data for simplicity
     return totalUnits / 4.0;
+}
+
+// Remove getSKUIdsByCategory if not declared in header, or add declaration
+const std::vector<std::string>& SKUAnalytics::getSKUIdsByCategory(const std::string& category) const {
+    static const std::vector<std::string> empty;
+    auto it = categoryMap.find(category);
+    return (it != categoryMap.end()) ? it->second : empty;
 }
 
 std::vector<SKU> SKUAnalytics::getSKUsByCategory(const std::string& category) const {
@@ -206,7 +218,6 @@ void SKUAnalytics::displayAllSKUs() const {
               << lowROAS << " Low ROAS | " << poorROAS << " Poor ROAS | " << noSales << " No Sales Data" << std::endl;
 }
 
-
 size_t SKUAnalytics::getSKUCount() const {
     return skuDatabase.size();
 }
@@ -229,5 +240,143 @@ double SKUAnalytics::calculateOverallROAS() const {
     }
     
     return (totalAdSpend > 0) ? totalRevenue / totalAdSpend : 0.0;
+}
 
+bool SKUAnalytics::loadFromCSV(const std::string& filename) {
+    try {
+        auto data = CSVHandler::readCSV(filename);
+        if (data.empty()) return false;
+        
+        // Clear existing data
+        skuDatabase.clear();
+        categoryMap.clear();
+        
+        // Skip header row if exists
+        size_t startRow = (data[0][0] == "SKU_ID" || data[0][0] == "sku_id") ? 1 : 0;
+        
+        for (size_t i = startRow; i < data.size(); ++i) {
+            const auto& row = data[i];
+            if (row.size() >= 6) {
+                std::string id = row[0];
+                std::string name = row[1];
+                std::string category = row[2];
+                double price = std::stod(row[3]);
+                double cost = std::stod(row[4]);
+                int inventory = std::stoi(row[5]);
+                
+                SKU sku(id, name, category, price, cost, inventory);
+                addSKU(sku);
+            }
+        }
+        
+        // Load sales data from separate file if exists
+        std::string salesFilename = "sales_" + filename;
+        std::ifstream salesFile(salesFilename);
+        if (salesFile.good()) {
+            salesFile.close();
+            auto salesData = CSVHandler::readCSV(salesFilename);
+            for (size_t i = (salesData[0][0] == "SKU_ID" ? 1 : 0); i < salesData.size(); ++i) {
+                const auto& row = salesData[i];
+                if (row.size() >= 7) {  // Fixed: should be 7 columns
+                    std::string skuId = row[0];
+                    Date date(std::stoi(row[1]), std::stoi(row[2]), std::stoi(row[3]));
+                    double revenue = std::stod(row[4]);
+                    double adSpend = std::stod(row[5]);
+                    int units = std::stoi(row[6]);
+                    
+                    SKU* sku = getSKU(skuId);
+                    if (sku) {
+                        sku->addSalesData(SalesData(date, revenue, adSpend, units));
+                    }
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading CSV: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool SKUAnalytics::saveToCSV(const std::string& filename) const {
+    try {
+        std::vector<std::vector<std::string>> data;
+        
+        // Add header
+        data.push_back({"SKU_ID", "NAME", "CATEGORY", "PRICE", "COST", "INVENTORY"});
+        
+        // Add SKU data
+        for (const auto& pair : skuDatabase) {
+            const SKU& sku = pair.second;
+            data.push_back({
+                sku.getSkuId(),
+                sku.getName(),
+                sku.getCategory(),
+                std::to_string(sku.getPrice()),
+                std::to_string(sku.getCost()),
+                std::to_string(sku.getInventory())
+            });
+        }
+        
+        return CSVHandler::writeCSV(filename, data);
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving to CSV: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool SKUAnalytics::exportSalesDataToCSV(const std::string& filename) const {
+    try {
+        std::vector<std::vector<std::string>> data;
+        
+        // Add header
+        data.push_back({"SKU_ID", "YEAR", "MONTH", "DAY", "REVENUE", "AD_SPEND", "UNITS_SOLD"});
+        
+        // Add sales data
+        for (const auto& pair : skuDatabase) {
+            const SKU& sku = pair.second;
+            for (const auto& sale : sku.getSalesHistory()) {
+                data.push_back({
+                    sku.getSkuId(),
+                    std::to_string(sale.getDate().getYear()),    // Use getter
+                    std::to_string(sale.getDate().getMonth()),   // Use getter
+                    std::to_string(sale.getDate().getDay()),     // Use getter
+                    std::to_string(sale.getRevenue()),
+                    std::to_string(sale.getAdSpend()),
+                    std::to_string(sale.getUnitsSold())
+                });
+            }
+        }
+        
+        return CSVHandler::writeCSV(filename, data);
+    } catch (const std::exception& e) {
+        std::cerr << "Error exporting sales data: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool SKUAnalytics::updateSKU(const std::string& skuId, const SKU& updatedSKU) {
+    auto it = skuDatabase.find(skuId);
+    if (it != skuDatabase.end()) {
+        // Remove from old category
+        std::string oldCategory = it->second.getCategory();
+        auto& oldCategorySKUs = categoryMap[oldCategory];
+        oldCategorySKUs.erase(
+            std::remove(oldCategorySKUs.begin(), oldCategorySKUs.end(), skuId),
+            oldCategorySKUs.end()
+        );
+        
+        // Clean up empty categories
+        if (oldCategorySKUs.empty()) {
+            categoryMap.erase(oldCategory);
+        }
+        
+        // Add to new category
+        skuDatabase[skuId] = updatedSKU;
+        categoryMap[updatedSKU.getCategory()].push_back(skuId);
+        
+        return true;
+    }
+    return false;
 }

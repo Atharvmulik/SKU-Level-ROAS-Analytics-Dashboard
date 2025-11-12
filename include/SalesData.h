@@ -11,6 +11,12 @@ struct SalesData {
     
     SalesData(Date d = Date(), double rev = 0.0, double ad = 0.0, int units = 0) 
         : date(d), revenue(rev), adSpend(ad), unitsSold(units) {}
+    
+    // Getters
+    Date getDate() const { return date; }
+    double getRevenue() const { return revenue; }
+    double getAdSpend() const { return adSpend; }
+    int getUnitsSold() const { return unitsSold; }
 };
 
 #endif
