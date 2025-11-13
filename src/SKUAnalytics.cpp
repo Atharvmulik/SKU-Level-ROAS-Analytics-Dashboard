@@ -15,7 +15,6 @@ void SKUAnalytics::addSKU(const SKU& sku) {
 bool SKUAnalytics::removeSKU(const std::string& skuId) {
     auto it = skuDatabase.find(skuId);
     if (it != skuDatabase.end()) {
-        // Remove from category map
         std::string category = it->second.getCategory();
         auto& categorySKUs = categoryMap[category];
         categorySKUs.erase(
@@ -23,7 +22,6 @@ bool SKUAnalytics::removeSKU(const std::string& skuId) {
             categorySKUs.end()
         );
         
-        // Remove from main database
         skuDatabase.erase(it);
         return true;
     }
@@ -95,7 +93,6 @@ double SKUAnalytics::calculateSalesVelocity(const SKU& sku) const {
     return totalUnits / 4.0;
 }
 
-// Remove getSKUIdsByCategory if not declared in header, or add declaration
 const std::vector<std::string>& SKUAnalytics::getSKUIdsByCategory(const std::string& category) const {
     static const std::vector<std::string> empty;
     auto it = categoryMap.find(category);

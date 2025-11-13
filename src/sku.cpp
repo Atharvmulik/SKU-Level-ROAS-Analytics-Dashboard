@@ -50,7 +50,7 @@ double SKU::calculateROAS(const Date& start, const Date& end) const {
         }
     }
     
-    // Safe division with epsilon check
+    
     return (totalAdSpend > std::numeric_limits<double>::epsilon()) ? 
            totalRevenue / totalAdSpend : 0.0;
 }
